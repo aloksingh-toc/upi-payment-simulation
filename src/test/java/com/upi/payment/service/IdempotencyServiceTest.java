@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,7 +50,7 @@ class IdempotencyServiceTest extends ServiceTestBase {
         when(idempotencyRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         assertThatNoException().isThrownBy(() ->
-                idempotencyService.store("key-1", "/api/v1/payments", new Object(), response, 201));
+                idempotencyService.store("key-1", "/api/v1/payments", Map.of("senderId", "uuid-1"), response, 201));
 
         verify(idempotencyRepository).saveAndFlush(any(IdempotencyRecord.class));
     }
@@ -61,7 +62,8 @@ class IdempotencyServiceTest extends ServiceTestBase {
 
         // Must NOT propagate — concurrent duplicate is handled gracefully
         assertThatNoException().isThrownBy(() ->
-                idempotencyService.store("dup-key", "/api/v1/payments", new Object(), new Object(), 201));
+                idempotencyService.store("dup-key", "/api/v1/payments",
+                        Map.of("senderId", "uuid-1"), Map.of("status", "PENDING"), 201));
     }
 
     @Test

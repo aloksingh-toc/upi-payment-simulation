@@ -9,6 +9,8 @@ import com.upi.payment.service.HmacService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -119,17 +121,28 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void payment_withoutApiKey_returns401() {
-        PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00"));
+        // Apache HttpClient (backing TestRestTemplate) retries auth challenges on POST,
+        // but can't do so in streaming mode — it throws ResourceAccessException before we
+        // even get a response.  Switch to SimpleClientHttpRequestFactory for this test;
+        // it has no auth-challenge handling so the 401 is returned directly.
+        ClientHttpRequestFactory original = restTemplate.getRestTemplate().getRequestFactory();
+        restTemplate.getRestTemplate().setRequestFactory(new SimpleClientHttpRequestFactory());
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        try {
+            PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00"));
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                "/api/v1/payments", HttpMethod.POST,
-                new HttpEntity<>(req, headers), String.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Idempotency-Key", UUID.randomUUID().toString());
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    "/api/v1/payments", HttpMethod.POST,
+                    new HttpEntity<>(req, headers), String.class);
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        } finally {
+            restTemplate.getRestTemplate().setRequestFactory(original);
+        }
     }
 
     record WebhookPayload(
