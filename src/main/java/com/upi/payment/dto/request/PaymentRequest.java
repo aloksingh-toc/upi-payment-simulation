@@ -1,7 +1,9 @@
 package com.upi.payment.dto.request;
 
 import com.upi.payment.enums.SupportedCurrency;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
