@@ -16,6 +16,11 @@
         <property name="message" value="Line has trailing whitespace."/>
     </module>
 
+    <!-- Line length — generous for modern code -->
+    <module name="LineLength">
+        <property name="max" value="150"/>
+    </module>
+
     <module name="TreeWalker">
 
         <!-- Imports -->
@@ -61,11 +66,6 @@
         <module name="HiddenField">
             <property name="ignoreConstructorParameter" value="true"/>
             <property name="ignoreSetter" value="true"/>
-        </module>
-
-        <!-- Line length — generous for modern code -->
-        <module name="LineLength">
-            <property name="max" value="150"/>
         </module>
 
     </module>

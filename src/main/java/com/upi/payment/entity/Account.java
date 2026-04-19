@@ -1,6 +1,11 @@
 package com.upi.payment.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -28,9 +33,17 @@ public class Account {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
-    public void setAccountId(UUID accountId) { this.accountId = accountId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
-    public void setCurrency(String currency) { this.currency = currency; }
+    public void setAccountId(UUID accountId) {
+        this.accountId = accountId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -41,7 +54,9 @@ public class Account {
 
     @PrePersist
     protected void onCreate() {
-        if (accountId == null) accountId = UUID.randomUUID();
+        if (accountId == null) {
+            accountId = UUID.randomUUID();
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }

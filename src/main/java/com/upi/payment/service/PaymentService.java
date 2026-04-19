@@ -2,7 +2,6 @@ package com.upi.payment.service;
 
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.dto.response.PaymentResponse;
-import com.upi.payment.entity.IdempotencyRecord;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.repository.TransactionRepository;

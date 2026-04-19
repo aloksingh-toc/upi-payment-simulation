@@ -1,7 +1,14 @@
 package com.upi.payment.entity;
 
 import com.upi.payment.enums.TransactionStatus;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -45,14 +52,27 @@ public class Transaction {
     private LocalDateTime updatedAt;
 
     // Setters for fields that must be writable during construction
-    public void setTransactionId(UUID transactionId) { this.transactionId = transactionId; }
-    public void setSenderId(UUID senderId) { this.senderId = senderId; }
-    public void setReceiverId(UUID receiverId) { this.receiverId = receiverId; }
-    public void setAmount(BigDecimal amount) { this.amount = amount; }
+    public void setTransactionId(UUID transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public void setSenderId(UUID senderId) {
+        this.senderId = senderId;
+    }
+
+    public void setReceiverId(UUID receiverId) {
+        this.receiverId = receiverId;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
 
     @PrePersist
     protected void onCreate() {
-        if (transactionId == null) transactionId = UUID.randomUUID();
+        if (transactionId == null) {
+            transactionId = UUID.randomUUID();
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
