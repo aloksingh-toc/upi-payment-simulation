@@ -33,7 +33,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void validBearerToken_setsAuthentication() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer correct-key");
-        when(request.getRequestURI()).thenReturn("/api/v1/payments");
+        // getRequestURI() is only called in shouldNotFilter(), not doFilterInternal() — no stub needed
 
         filter.doFilterInternal(request, response, chain);
 
@@ -44,8 +44,8 @@ class ApiKeyAuthFilterTest {
     @Test
     void invalidBearerToken_noAuthentication() throws Exception {
         when(request.getHeader("Authorization")).thenReturn("Bearer wrong-key");
-        when(request.getRemoteAddr()).thenReturn("127.0.0.1");
-        when(request.getRequestURI()).thenReturn("/api/v1/payments");
+        // getRemoteAddr() appears in a log.warn call; we don't assert on it — no stub needed
+        // getRequestURI() is only called in shouldNotFilter(), not doFilterInternal() — no stub needed
 
         filter.doFilterInternal(request, response, chain);
 
@@ -56,7 +56,7 @@ class ApiKeyAuthFilterTest {
     @Test
     void missingAuthHeader_noAuthentication() throws Exception {
         when(request.getHeader("Authorization")).thenReturn(null);
-        when(request.getRequestURI()).thenReturn("/api/v1/payments");
+        // getRequestURI() is only called in shouldNotFilter(), not doFilterInternal() — no stub needed
 
         filter.doFilterInternal(request, response, chain);
 

@@ -2,12 +2,14 @@ package com.upi.payment.integration;
 
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.enums.SupportedCurrency;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -28,6 +30,22 @@ abstract class AbstractIntegrationTest {
 
     @Autowired
     protected TestRestTemplate restTemplate;
+
+    /**
+     * Both Apache HttpClient (the default TestRestTemplate backend) and Java's
+     * HttpURLConnection throw an IOException — "cannot retry due to server
+     * authentication, in streaming mode" — when a POST is sent in streaming mode
+     * and the server responds with 401.  Switching to a non-streaming
+     * SimpleClientHttpRequestFactory buffers the body before sending, so
+     * HttpURLConnection can handle a 401 response and return it normally instead
+     * of throwing.
+     */
+    @BeforeEach
+    void configureRestTemplateFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setOutputStreaming(false);
+        restTemplate.getRestTemplate().setRequestFactory(factory);
+    }
 
     protected static final String API_KEY = "test-api-key";
     protected static final UUID SENDER_ID =
