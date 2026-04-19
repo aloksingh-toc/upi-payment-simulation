@@ -9,8 +9,6 @@ import com.upi.payment.service.HmacService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -121,28 +119,19 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void payment_withoutApiKey_returns401() {
-        // Apache HttpClient (backing TestRestTemplate) retries auth challenges on POST,
-        // but can't do so in streaming mode — it throws ResourceAccessException before we
-        // even get a response.  Switch to SimpleClientHttpRequestFactory for this test;
-        // it has no auth-challenge handling so the 401 is returned directly.
-        ClientHttpRequestFactory original = restTemplate.getRestTemplate().getRequestFactory();
-        restTemplate.getRestTemplate().setRequestFactory(new SimpleClientHttpRequestFactory());
+        // Factory is pre-configured to non-streaming mode in AbstractIntegrationTest.@BeforeEach
+        // so HttpURLConnection returns the 401 cleanly without throwing HttpRetryException.
+        PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00"));
 
-        try {
-            PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00"));
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Idempotency-Key", UUID.randomUUID().toString());
+        ResponseEntity<String> response = restTemplate.exchange(
+                "/api/v1/payments", HttpMethod.POST,
+                new HttpEntity<>(req, headers), String.class);
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    "/api/v1/payments", HttpMethod.POST,
-                    new HttpEntity<>(req, headers), String.class);
-
-            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        } finally {
-            restTemplate.getRestTemplate().setRequestFactory(original);
-        }
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     record WebhookPayload(
