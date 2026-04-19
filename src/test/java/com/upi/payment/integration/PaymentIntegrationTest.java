@@ -9,11 +9,13 @@ import com.upi.payment.service.HmacService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class PaymentIntegrationTest extends AbstractIntegrationTest {
 
@@ -72,22 +74,23 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         assertThat(response.getBody().getBalance()).isNotNull();
     }
 
+    /**
+     * Uses MockMvc (in-process) instead of TestRestTemplate for this test.
+     * Both Apache HttpClient and Java's HttpURLConnection throw
+     * "cannot retry due to server authentication, in streaming mode" when a
+     * POST body is sent in streaming mode and the server replies with 401.
+     * MockMvc bypasses the HTTP transport layer entirely.
+     */
     @Test
     void webhook_invalidSignature_returns401() throws Exception {
         String payload = objectMapper.writeValueAsString(
                 new WebhookPayload(UUID.randomUUID(), "SUCCESS", "REF001"));
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("X-Webhook-Signature", "invalidsignature");
-
-        ResponseEntity<String> response = restTemplate.exchange(
-                "/api/v1/webhooks/upi",
-                HttpMethod.POST,
-                new HttpEntity<>(payload, headers),
-                String.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/webhooks/upi")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Webhook-Signature", "invalidsignature")
+                        .content(payload))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -117,21 +120,17 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
         assertThat(webhookResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    /** Uses MockMvc to avoid POST + 401 streaming-mode IOException in HttpURLConnection. */
     @Test
-    void payment_withoutApiKey_returns401() {
-        // Factory is pre-configured to non-streaming mode in AbstractIntegrationTest.@BeforeEach
-        // so HttpURLConnection returns the 401 cleanly without throwing HttpRetryException.
-        PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00"));
+    void payment_withoutApiKey_returns401() throws Exception {
+        String body = objectMapper.writeValueAsString(
+                buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("10.00")));
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Idempotency-Key", UUID.randomUUID().toString());
-
-        ResponseEntity<String> response = restTemplate.exchange(
-                "/api/v1/payments", HttpMethod.POST,
-                new HttpEntity<>(req, headers), String.class);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        mockMvc.perform(MockMvcRequestBuilders.post("/api/v1/payments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .content(body))
+                .andExpect(status().isUnauthorized());
     }
 
     record WebhookPayload(
