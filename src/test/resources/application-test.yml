@@ -1,0 +1,18 @@
+app:
+  api-key: test-api-key
+  webhook:
+    secret: test-webhook-secret
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true   # acceptable in ephemeral Testcontainer DBs
+
+logging:
+  level:
+    com.upi.payment: DEBUG

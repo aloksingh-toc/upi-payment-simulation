@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/upi_payment
+    username: ${POSTGRES_USER:upi_user}
+    password: ${POSTGRES_PASSWORD}
+
+# Swagger UI enabled by default — set SWAGGER_ENABLED=false in production
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}

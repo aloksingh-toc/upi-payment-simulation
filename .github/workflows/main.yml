@@ -1,0 +1,58 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test-package:
+    name: Build · Test · Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # Testcontainers pulls PostgreSQL at test time — no sidecar service needed.
+      - name: Compile
+        run: mvn clean compile -B
+
+      - name: Test (unit + integration via Testcontainers)
+        run: mvn test -B
+
+      - name: Static analysis (Checkstyle — fails build on violations)
+        run: mvn checkstyle:check -B
+
+      - name: OWASP dependency vulnerability scan
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn dependency-check:check -B
+
+      - name: Package JAR
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: mvn package -DskipTests -B
+
+      - name: Upload JAR artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: upi-payment-jar
+          path: target/*.jar
+          retention-days: 7
+
+      - name: Build Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          docker build \
+            -t upi-payment-simulation:${{ github.sha }} \
+            -t upi-payment-simulation:latest \
+            .
