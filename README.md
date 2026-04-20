@@ -31,8 +31,9 @@ A production-grade REST API simulating a UPI payment gateway. Built with Java 21
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/v1/payments` | Bearer API key | Initiate a payment |
+| `POST` | `/api/v1/payments` | Bearer API key | Initiate a payment (rate limited: 20/min per IP) |
 | `GET` | `/api/v1/accounts/{id}/balance` | Bearer API key | Get account balance |
+| `GET` | `/api/v1/accounts/{id}/transactions` | Bearer API key | Paginated transaction history |
 | `POST` | `/api/v1/webhooks/upi` | HMAC-SHA256 | Receive bank webhook |
 | `GET` | `/actuator/health` | None | Health check |
 
