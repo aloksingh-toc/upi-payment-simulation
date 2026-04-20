@@ -4,9 +4,10 @@ spring:
     username: ${POSTGRES_USER:upi_user}
     password: ${POSTGRES_PASSWORD}
 
-# Swagger UI enabled by default — set SWAGGER_ENABLED=false in production
+# Swagger UI is OFF by default in Docker/production.
+# Set SWAGGER_ENABLED=true only for local debugging.
 springdoc:
   api-docs:
-    enabled: ${SWAGGER_ENABLED:true}
+    enabled: ${SWAGGER_ENABLED:false}
   swagger-ui:
-    enabled: ${SWAGGER_ENABLED:true}
+    enabled: ${SWAGGER_ENABLED:false}
