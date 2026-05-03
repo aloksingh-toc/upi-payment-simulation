@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(422, "Insufficient Funds", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidRefundException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRefund(InvalidRefundException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(new ErrorResponse(422, "Invalid Refund", ex.getMessage()));
+    }
+
     @ExceptionHandler(InvalidSignatureException.class)
     public ResponseEntity<ErrorResponse> handleInvalidSignature(InvalidSignatureException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
