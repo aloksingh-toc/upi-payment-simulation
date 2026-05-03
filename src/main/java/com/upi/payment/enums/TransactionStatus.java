@@ -1,5 +1,5 @@
 package com.upi.payment.enums;
 
 public enum TransactionStatus {
-    PENDING, SUCCESS, FAILED
+    PENDING, SUCCESS, FAILED, REFUNDED
 }
