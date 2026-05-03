@@ -22,6 +22,11 @@ spring:
     # baseline-on-migrate must be opted-in explicitly — do NOT enable by default
     # as it can mask schema inconsistencies on existing databases.
     baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
 
 server:
   port: 8080
