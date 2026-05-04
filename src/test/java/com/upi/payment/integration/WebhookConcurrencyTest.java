@@ -41,7 +41,7 @@ class WebhookConcurrencyTest extends AbstractIntegrationTest {
 
         PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, transferAmount);
         PaymentResponse payment = paymentService.initiatePayment(req, UUID.randomUUID().toString());
-        UUID txId = payment.getTransactionId();
+        UUID txId = payment.transactionId();
 
         int threads = 5;
         CountDownLatch ready = new CountDownLatch(threads);

@@ -38,8 +38,8 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getTransactionId()).isNotNull();
-        assertThat(response.getBody().getStatus()).isEqualTo("PENDING");
+        assertThat(response.getBody().transactionId()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo("PENDING");
     }
 
     @Test
@@ -58,8 +58,8 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
                 "/api/v1/payments", HttpMethod.POST,
                 new HttpEntity<>(req, headers), PaymentResponse.class);
 
-        assertThat(first.getBody().getTransactionId())
-                .isEqualTo(second.getBody().getTransactionId());
+        assertThat(first.getBody().transactionId())
+                .isEqualTo(second.getBody().transactionId());
     }
 
     @Test
@@ -71,7 +71,7 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
                 BalanceResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody().getBalance()).isNotNull();
+        assertThat(response.getBody().balance()).isNotNull();
     }
 
     /**
@@ -104,7 +104,7 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
                 new HttpEntity<>(req, apiHdr), PaymentResponse.class).getBody();
 
         String payload = objectMapper.writeValueAsString(
-                new WebhookPayload(payment.getTransactionId(), "SUCCESS", "BANKREF999"));
+                new WebhookPayload(payment.transactionId(), "SUCCESS", "BANKREF999"));
         String sig = hmacService.computeHmac(payload);
 
         HttpHeaders whHeaders = new HttpHeaders();
