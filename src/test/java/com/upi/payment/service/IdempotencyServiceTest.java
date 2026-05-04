@@ -76,8 +76,8 @@ class IdempotencyServiceTest extends ServiceTestBase {
 
         PaymentResponse result = idempotencyService.deserializeResponse(record, PaymentResponse.class);
 
-        assertThat(result.getTransactionId()).isEqualTo(txId);
-        assertThat(result.getStatus()).isEqualTo("PENDING");
+        assertThat(result.transactionId()).isEqualTo(txId);
+        assertThat(result.status()).isEqualTo("PENDING");
     }
 
     @Test
