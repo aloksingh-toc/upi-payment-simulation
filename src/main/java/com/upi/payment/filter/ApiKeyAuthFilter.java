@@ -38,7 +38,10 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
                                 "api-client", null,
                                 List.of(new SimpleGrantedAuthority("ROLE_API"))));
             } else {
-                log.warn("Invalid API key from ip={}", request.getRemoteAddr());
+                // Log the TCP-layer IP — this is reliable even behind a proxy.
+                // X-Forwarded-For is not logged here because it can be spoofed by the caller.
+                log.warn("Invalid API key attempt ip={} uri={}", request.getRemoteAddr(),
+                        request.getRequestURI());
             }
         }
 

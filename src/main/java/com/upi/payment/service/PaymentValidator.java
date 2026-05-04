@@ -3,6 +3,7 @@ package com.upi.payment.service;
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.AccountRepository;
+import com.upi.payment.util.PaymentConstants;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,22 @@ public class PaymentValidator {
         rejectSelfTransfer(request);
         requireSenderExists(request);
         requireReceiverExists(request);
+    }
+
+    /**
+     * Trims and validates the Idempotency-Key header value.
+     *
+     * @return the trimmed key, guaranteed to be non-empty and within length limits
+     * @throws IllegalArgumentException if the key is blank or too long
+     */
+    public String validateIdempotencyKey(String key) {
+        String trimmed = (key == null) ? "" : key.trim();
+        if (trimmed.isEmpty() || trimmed.length() > PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Idempotency-Key must be between 1 and "
+                            + PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH + " characters");
+        }
+        return trimmed;
     }
 
     private void rejectSelfTransfer(PaymentRequest request) {

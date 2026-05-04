@@ -1,6 +1,7 @@
 package com.upi.payment.repository;
 
 import com.upi.payment.entity.Transaction;
+import com.upi.payment.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,5 +20,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
      */
     Page<Transaction> findBySenderIdOrReceiverId(
             UUID senderId, UUID receiverId, Pageable pageable);
-}
 
+    /** Finds a transaction or throws {@link ResourceNotFoundException} — eliminates boilerplate. */
+    default Transaction findByIdOrThrow(UUID id) {
+        return findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction not found: " + id));
+    }
+}

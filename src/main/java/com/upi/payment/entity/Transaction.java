@@ -34,7 +34,10 @@ public class Transaction {
     @Column(name = "amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
-    // Mutable: transitions PENDING → SUCCESS or PENDING → FAILED
+    @Column(name = "currency", nullable = false, length = 3)
+    private String currency;
+
+    // Mutable: transitions PENDING → SUCCESS / FAILED / REFUNDED
     @Setter
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
@@ -51,22 +54,28 @@ public class Transaction {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // Setters for fields that must be writable during construction
-    public void setTransactionId(UUID transactionId) {
-        this.transactionId = transactionId;
+    /**
+     * Preferred constructor — keeps entity construction logic inside the entity
+     * and out of service classes.
+     */
+    public static Transaction create(UUID senderId, UUID receiverId,
+                                     BigDecimal amount, String currency) {
+        Transaction tx = new Transaction();
+        tx.transactionId = UUID.randomUUID();
+        tx.senderId      = senderId;
+        tx.receiverId    = receiverId;
+        tx.amount        = amount;
+        tx.currency      = currency;
+        tx.status        = TransactionStatus.PENDING;
+        return tx;
     }
 
-    public void setSenderId(UUID senderId) {
-        this.senderId = senderId;
-    }
-
-    public void setReceiverId(UUID receiverId) {
-        this.receiverId = receiverId;
-    }
-
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
+    // Field setters retained for JPA and test usage
+    public void setTransactionId(UUID transactionId)  { this.transactionId = transactionId; }
+    public void setSenderId(UUID senderId)             { this.senderId = senderId; }
+    public void setReceiverId(UUID receiverId)         { this.receiverId = receiverId; }
+    public void setAmount(BigDecimal amount)           { this.amount = amount; }
+    public void setCurrency(String currency)           { this.currency = currency; }
 
     @PrePersist
     protected void onCreate() {

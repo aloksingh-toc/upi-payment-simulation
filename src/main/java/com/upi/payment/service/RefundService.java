@@ -4,7 +4,6 @@ import com.upi.payment.dto.response.RefundResponse;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.exception.InvalidRefundException;
-import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,9 +39,7 @@ public class RefundService {
         // Serialise concurrent refund requests for the same transaction.
         lockService.acquireTransactionLock(transactionId);
 
-        Transaction tx = transactionRepository.findById(transactionId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Transaction not found: " + transactionId));
+        Transaction tx = transactionRepository.findByIdOrThrow(transactionId);
 
         if (tx.getStatus() != TransactionStatus.SUCCESS) {
             throw new InvalidRefundException(

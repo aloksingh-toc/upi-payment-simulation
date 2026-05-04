@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/upi_payment
-    username: upi_user
-    password: upi_password
+    username: ${DB_USERNAME:upi_user}
+    password: ${DB_PASSWORD:CHANGE_ME_LOCAL}
     hikari:
       maximum-pool-size: 20
       minimum-idle: 5
@@ -49,12 +49,14 @@ app:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: false
   swagger-ui:
     path: /swagger-ui.html
+    enabled: false
     display-request-duration: true
     tags-sorter: alpha
     operations-sorter: alpha
-    try-it-out-enabled: true
+    try-it-out-enabled: false
 
 management:
   endpoints:
@@ -67,5 +69,5 @@ management:
 
 logging:
   level:
-    com.upi.payment: DEBUG
-    org.springframework.security: INFO
+    com.upi.payment: INFO
+    org.springframework.security: WARN

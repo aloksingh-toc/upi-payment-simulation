@@ -1,5 +1,7 @@
 package com.upi.payment.service;
 
+import com.upi.payment.util.PaymentConstants;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,13 +15,28 @@ import java.util.HexFormat;
 public class HmacService {
 
     @Value("${app.webhook.secret}")
-    private String webhookSecret;
+    private String webhookSecretRaw;
+
+    /**
+     * Pre-computed key spec — avoids re-encoding the raw secret on every call
+     * and removes the plain String from the heap after initialisation.
+     */
+    private SecretKeySpec secretKeySpec;
+
+    @PostConstruct
+    void init() {
+        secretKeySpec = new SecretKeySpec(
+                webhookSecretRaw.getBytes(StandardCharsets.UTF_8),
+                PaymentConstants.HMAC_ALGORITHM);
+        // Clear the raw string reference — the key material now lives only in the KeySpec.
+        webhookSecretRaw = null;
+    }
 
     public String computeHmac(String payload) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(
-                    webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            // Mac is NOT thread-safe — always create a new instance per call.
+            Mac mac = Mac.getInstance(PaymentConstants.HMAC_ALGORITHM);
+            mac.init(secretKeySpec);
             byte[] hash = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {

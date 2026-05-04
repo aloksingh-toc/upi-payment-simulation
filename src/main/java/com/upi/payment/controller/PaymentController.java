@@ -26,8 +26,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
-
 @Tag(name = "Payments", description = "Initiate and manage UPI payments")
 @RestController
 @RequestMapping("/api/v1/payments")
@@ -66,14 +64,8 @@ public class PaymentController {
             @RequestHeader(PaymentConstants.IDEMPOTENCY_KEY_HEADER) String idempotencyKey,
             @Valid @RequestBody PaymentRequest request) {
 
-        String trimmed = idempotencyKey == null ? "" : idempotencyKey.trim();
-        if (trimmed.isEmpty() || trimmed.length() > PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH) {
-            throw new IllegalArgumentException(
-                    "Idempotency-Key must be between 1 and "
-                            + PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH + " characters");
-        }
-
-        PaymentResponse response = paymentService.initiatePayment(request, trimmed);
+        // Validation and trimming delegated to PaymentService → PaymentValidator
+        PaymentResponse response = paymentService.initiatePayment(request, idempotencyKey);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

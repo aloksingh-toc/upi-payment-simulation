@@ -2,6 +2,7 @@ package com.upi.payment.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upi.payment.dto.response.ErrorResponse;
+import com.upi.payment.util.PaymentConstants;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
@@ -22,13 +23,16 @@ import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Token-bucket rate limiter for payment initiation.
+ * Token-bucket rate limiter for payment initiation and webhook callbacks.
  *
- * Each client IP gets its own bucket: 20 payment requests per 60 seconds.
- * Exceeding the limit returns HTTP 429 with a JSON error body.
+ * Payment endpoint (POST /api/v1/payments): 20 requests per 60 s per IP.
+ * Webhook endpoint (POST /api/v1/webhooks/upi): 100 requests per 60 s per IP.
  *
- * Bucket4j's token-bucket algorithm allows short bursts while enforcing a
- * sustainable average rate, which matches real UPI gateway behaviour.
+ * Client IP is always taken from the TCP-layer remote address (request.getRemoteAddr()).
+ * X-Forwarded-For is intentionally ignored — trusting an unvalidated header allows any
+ * caller to spoof an arbitrary IP and bypass the rate limit entirely.  If this service
+ * runs behind a trusted reverse proxy, configure Spring's ForwardedHeaderFilter with an
+ * explicit trustedProxies list instead of reading the header directly here.
  *
  * Note: this in-memory map resets on restart and is per-instance only.
  * For a multi-node deployment, replace with a Redis-backed Bucket4j store.
@@ -39,28 +43,41 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final int MAX_REQUESTS = 20;
-    private static final int WINDOW_SECONDS = 60;
-    private static final String PAYMENTS_PATH = "/api/v1/payments";
+    private static final int PAYMENT_MAX_REQUESTS  = 20;
+    private static final int WEBHOOK_MAX_REQUESTS  = 100;
+    private static final int WINDOW_SECONDS        = 60;
 
     private final ObjectMapper objectMapper;
 
-    // One bucket per client IP — created lazily and kept for the JVM lifetime.
-    private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+    /** Separate bucket maps keep payment and webhook limits independent. */
+    private final ConcurrentHashMap<String, Bucket> paymentBuckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Bucket> webhookBuckets = new ConcurrentHashMap<>();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        // Only rate-limit POST /api/v1/payments; every other path passes through freely.
-        return !("POST".equalsIgnoreCase(request.getMethod())
-                && PAYMENTS_PATH.equals(request.getRequestURI()));
+        String method = request.getMethod();
+        String uri    = request.getRequestURI();
+
+        boolean isPayment = "POST".equalsIgnoreCase(method)
+                && PaymentConstants.PAYMENTS_API_PATH.equals(uri);
+        boolean isWebhook = "POST".equalsIgnoreCase(method)
+                && uri.startsWith(PaymentConstants.WEBHOOKS_API_PATH);
+
+        return !isPayment && !isWebhook;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
-        String clientIp = getClientIp(request);
-        Bucket bucket = buckets.computeIfAbsent(clientIp, ip -> createBucket());
+        String clientIp = request.getRemoteAddr();
+        boolean isWebhook = request.getRequestURI().startsWith(PaymentConstants.WEBHOOKS_API_PATH);
+
+        Bucket bucket = isWebhook
+                ? webhookBuckets.computeIfAbsent(clientIp, ip -> createBucket(WEBHOOK_MAX_REQUESTS))
+                : paymentBuckets.computeIfAbsent(clientIp, ip -> createBucket(PAYMENT_MAX_REQUESTS));
+
+        int limit = isWebhook ? WEBHOOK_MAX_REQUESTS : PAYMENT_MAX_REQUESTS;
 
         if (bucket.tryConsume(1)) {
             chain.doFilter(request, response);
@@ -70,24 +87,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write(objectMapper.writeValueAsString(
                     new ErrorResponse(429, "Too Many Requests",
-                            "Rate limit exceeded. Max " + MAX_REQUESTS
-                                    + " payment requests per " + WINDOW_SECONDS + " seconds.")));
+                            "Rate limit exceeded. Max " + limit
+                                    + " requests per " + WINDOW_SECONDS + " seconds.")));
         }
     }
 
-    private Bucket createBucket() {
+    private Bucket createBucket(int maxRequests) {
         Bandwidth limit = Bandwidth.classic(
-                MAX_REQUESTS, Refill.greedy(MAX_REQUESTS, Duration.ofSeconds(WINDOW_SECONDS)));
+                maxRequests, Refill.greedy(maxRequests, Duration.ofSeconds(WINDOW_SECONDS)));
         return Bucket.builder().addLimit(limit).build();
-    }
-
-    /** Reads the real client IP, honoring reverse-proxy X-Forwarded-For headers. */
-    private String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            // X-Forwarded-For may be comma-separated; first entry is the originating IP.
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

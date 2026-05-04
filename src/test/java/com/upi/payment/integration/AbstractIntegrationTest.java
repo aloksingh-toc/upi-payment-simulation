@@ -1,7 +1,7 @@
 package com.upi.payment.integration;
 
 import com.upi.payment.dto.request.PaymentRequest;
-import com.upi.payment.enums.SupportedCurrency;
+import com.upi.payment.util.PaymentTestFixtures;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,11 +69,6 @@ abstract class AbstractIntegrationTest {
     }
 
     protected PaymentRequest buildPaymentRequest(UUID sender, UUID receiver, BigDecimal amount) {
-        PaymentRequest req = new PaymentRequest();
-        req.setSenderId(sender);
-        req.setReceiverId(receiver);
-        req.setAmount(amount);
-        req.setCurrency(SupportedCurrency.INR);
-        return req;
+        return PaymentTestFixtures.buildPaymentRequest(sender, receiver, amount);
     }
 }
