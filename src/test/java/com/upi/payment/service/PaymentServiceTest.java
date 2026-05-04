@@ -37,13 +37,14 @@ class PaymentServiceTest extends ServiceTestBase {
         PaymentRequest req = buildPaymentRequest(senderId, receiverId, new BigDecimal("500.00"));
         String idemKey = UUID.randomUUID().toString();
 
+        when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.empty());
         when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         PaymentResponse response = paymentService.initiatePayment(req, idemKey);
 
-        assertThat(response.getTransactionId()).isNotNull();
-        assertThat(response.getStatus()).isEqualTo("PENDING");
+        assertThat(response.transactionId()).isNotNull();
+        assertThat(response.status()).isEqualTo("PENDING");
 
         verify(ledgerService).debit(senderId, req.getAmount());
 
@@ -61,6 +62,7 @@ class PaymentServiceTest extends ServiceTestBase {
         PaymentRequest req = buildPaymentRequest(senderId, receiverId, new BigDecimal("99999.00"));
         String idemKey = UUID.randomUUID().toString();
 
+        when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.empty());
         doThrow(new InsufficientFundsException("not enough"))
                 .when(ledgerService).debit(any(), any());
@@ -76,6 +78,7 @@ class PaymentServiceTest extends ServiceTestBase {
         PaymentRequest req = buildPaymentRequest(senderId, receiverId, new BigDecimal("100.00"));
         String idemKey = UUID.randomUUID().toString();
 
+        when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.empty());
         doThrow(new ResourceNotFoundException("Sender account not found: " + senderId))
                 .when(paymentValidator).validate(req);
@@ -90,6 +93,7 @@ class PaymentServiceTest extends ServiceTestBase {
         PaymentRequest req = buildPaymentRequest(senderId, receiverId, new BigDecimal("100.00"));
         String idemKey = UUID.randomUUID().toString();
 
+        when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.empty());
         doThrow(new ResourceNotFoundException("Receiver account not found: " + receiverId))
                 .when(paymentValidator).validate(req);
@@ -107,6 +111,7 @@ class PaymentServiceTest extends ServiceTestBase {
         IdempotencyRecord cached = new IdempotencyRecord();
         PaymentResponse cachedResponse = new PaymentResponse(UUID.randomUUID(), "PENDING");
 
+        when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.of(cached));
         when(idempotencyService.deserializeResponse(cached, PaymentResponse.class))
                 .thenReturn(cachedResponse);
@@ -114,6 +119,9 @@ class PaymentServiceTest extends ServiceTestBase {
         PaymentResponse result = paymentService.initiatePayment(req, idemKey);
 
         assertThat(result).isEqualTo(cachedResponse);
-        verifyNoInteractions(transactionRepository, ledgerService, lockService, paymentValidator);
+        // validateIdempotencyKey was called, so paymentValidator had one interaction
+        verify(paymentValidator).validateIdempotencyKey(idemKey);
+        verifyNoInteractions(transactionRepository, ledgerService, lockService);
+        verify(paymentValidator, never()).validate(any());
     }
 }

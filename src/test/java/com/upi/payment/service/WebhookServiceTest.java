@@ -1,49 +1,53 @@
 package com.upi.payment.service;
 
-import com.upi.payment.entity.Account;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.upi.payment.dto.request.WebhookRequest;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.enums.WebhookStatus;
 import com.upi.payment.exception.InvalidSignatureException;
-import com.upi.payment.repository.AccountRepository;
+import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.TransactionRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class WebhookServiceTest extends ServiceTestBase {
 
     @Mock private TransactionRepository transactionRepository;
-    @Mock private AccountRepository accountRepository;
     @Mock private HmacService hmacService;
     @Mock private LockService lockService;
     @Mock private LedgerService ledgerService;
+    @Mock private ObjectMapper objectMapper;
 
     @InjectMocks private WebhookService webhookService;
 
-    // ── verifySignature ──────────────────────────────────────────────────────
+    // ── verifyAndDeserialize ─────────────────────────────────────────────────
 
     @Test
-    void verifySignature_validSignature_doesNotThrow() {
+    void verifyAndDeserialize_validSignature_returnsRequest() throws Exception {
+        WebhookRequest expected = new WebhookRequest();
         when(hmacService.verifySignature("payload", "sig")).thenReturn(true);
+        when(objectMapper.readValue("payload", WebhookRequest.class)).thenReturn(expected);
 
-        assertThatNoException().isThrownBy(() ->
-                webhookService.verifySignature("payload", "sig"));
+        WebhookRequest result = webhookService.verifyAndDeserialize("payload", "sig");
+
+        assertThat(result).isSameAs(expected);
     }
 
     @Test
-    void verifySignature_invalidSignature_throwsInvalidSignature() {
+    void verifyAndDeserialize_invalidSignature_throwsInvalidSignature() {
         when(hmacService.verifySignature("payload", "bad")).thenReturn(false);
 
-        assertThatThrownBy(() -> webhookService.verifySignature("payload", "bad"))
+        assertThatThrownBy(() -> webhookService.verifyAndDeserialize("payload", "bad"))
                 .isInstanceOf(InvalidSignatureException.class);
     }
 
@@ -54,7 +58,7 @@ class WebhookServiceTest extends ServiceTestBase {
         UUID txId = UUID.randomUUID();
         Transaction tx = pendingTransaction(txId, senderId, receiverId, new BigDecimal("300.00"));
 
-        when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+        when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
         when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         webhookService.processWebhook(txId, WebhookStatus.SUCCESS, "BANKREF-001");
@@ -71,7 +75,7 @@ class WebhookServiceTest extends ServiceTestBase {
         UUID txId = UUID.randomUUID();
         Transaction tx = pendingTransaction(txId, senderId, receiverId, new BigDecimal("200.00"));
 
-        when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+        when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
         when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         webhookService.processWebhook(txId, WebhookStatus.FAILED, "BANKREF-002");
@@ -88,7 +92,7 @@ class WebhookServiceTest extends ServiceTestBase {
         Transaction tx = pendingTransaction(txId, senderId, receiverId, new BigDecimal("100.00"));
         tx.setStatus(TransactionStatus.SUCCESS); // already processed
 
-        when(transactionRepository.findById(txId)).thenReturn(Optional.of(tx));
+        when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
 
         webhookService.processWebhook(txId, WebhookStatus.SUCCESS, "BANKREF-DUP");
 
@@ -101,7 +105,8 @@ class WebhookServiceTest extends ServiceTestBase {
     @Test
     void processWebhook_transactionNotFound_logsAndDoesNotThrow() {
         UUID txId = UUID.randomUUID();
-        when(transactionRepository.findById(txId)).thenReturn(Optional.empty());
+        when(transactionRepository.findByIdOrThrow(txId))
+                .thenThrow(new ResourceNotFoundException("Transaction not found: " + txId));
 
         // @Async methods catch all exceptions internally — must not propagate
         assertThatNoException().isThrownBy(() ->
@@ -118,6 +123,7 @@ class WebhookServiceTest extends ServiceTestBase {
         tx.setSenderId(sender);
         tx.setReceiverId(receiver);
         tx.setAmount(amount);
+        tx.setCurrency("INR");
         tx.setStatus(TransactionStatus.PENDING);
         return tx;
     }

@@ -8,7 +8,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +21,7 @@ class LedgerServiceTest extends ServiceTestBase {
 
     @Test
     void debit_sufficientFunds_reducesBalance() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(account);
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ledgerService.debit(accountId, new BigDecimal("400.00"));
@@ -33,7 +32,7 @@ class LedgerServiceTest extends ServiceTestBase {
 
     @Test
     void debit_insufficientFunds_throws() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(account);
 
         assertThatThrownBy(() -> ledgerService.debit(accountId, new BigDecimal("9999.00")))
                 .isInstanceOf(InsufficientFundsException.class);
@@ -43,7 +42,8 @@ class LedgerServiceTest extends ServiceTestBase {
 
     @Test
     void debit_accountNotFound_throws() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.empty());
+        when(accountRepository.findByIdOrThrow(accountId))
+                .thenThrow(new ResourceNotFoundException("Account not found: " + accountId));
 
         assertThatThrownBy(() -> ledgerService.debit(accountId, BigDecimal.TEN))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -51,7 +51,7 @@ class LedgerServiceTest extends ServiceTestBase {
 
     @Test
     void credit_increasesBalance() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(account);
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ledgerService.credit(accountId, new BigDecimal("250.00"));
@@ -61,7 +61,7 @@ class LedgerServiceTest extends ServiceTestBase {
 
     @Test
     void credit_scaleIsAlways4DecimalPlaces() {
-        when(accountRepository.findById(accountId)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdOrThrow(accountId)).thenReturn(account);
         when(accountRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ledgerService.credit(accountId, new BigDecimal("0.1"));
