@@ -1,16 +1,20 @@
 package com.upi.payment.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
-@Data
-@AllArgsConstructor
-public class BalanceResponse {
+@Schema(description = "Account balance response")
+public record BalanceResponse(
 
-    private UUID accountId;
-    private BigDecimal balance;
-    private String currency;
-}
+        @Schema(description = "Account UUID")
+        UUID accountId,
+
+        @Schema(description = "Current balance", example = "50000.00")
+        BigDecimal balance,
+
+        @Schema(description = "Currency code", example = "INR")
+        String currency
+
+) {}

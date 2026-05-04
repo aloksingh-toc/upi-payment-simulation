@@ -3,7 +3,6 @@ package com.upi.payment.service;
 import com.upi.payment.dto.response.BalanceResponse;
 import com.upi.payment.dto.response.TransactionHistoryResponse;
 import com.upi.payment.entity.Account;
-import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.AccountRepository;
 import com.upi.payment.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,17 +22,15 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public BalanceResponse getBalance(UUID accountId) {
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Account not found: " + accountId));
+        Account account = accountRepository.findByIdOrThrow(accountId);
         return new BalanceResponse(account.getAccountId(), account.getBalance(), account.getCurrency());
     }
 
     @Transactional(readOnly = true)
     public Page<TransactionHistoryResponse> getTransactions(UUID accountId, Pageable pageable) {
-        accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Account not found: " + accountId));
+        // Validate account exists before querying transactions
+        accountRepository.findByIdOrThrow(accountId);
+
         return transactionRepository
                 .findBySenderIdOrReceiverId(accountId, accountId, pageable)
                 .map(tx -> new TransactionHistoryResponse(
@@ -41,9 +38,9 @@ public class AccountService {
                         tx.getSenderId(),
                         tx.getReceiverId(),
                         tx.getAmount(),
+                        tx.getCurrency(),
                         tx.getStatus().name(),
                         tx.getBankReferenceNumber(),
                         tx.getCreatedAt()));
     }
 }
-

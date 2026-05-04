@@ -1,6 +1,7 @@
 package com.upi.payment.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.upi.payment.enums.TransactionStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -25,7 +26,11 @@ public record TransactionHistoryResponse(
         @Schema(description = "Payment amount in INR", example = "500.00")
         BigDecimal amount,
 
-        @Schema(description = "Current status", allowableValues = {"PENDING", "SUCCESS", "FAILED"})
+        @Schema(description = "Currency code of the payment", example = "INR")
+        String currency,
+
+        // References the enum so the Swagger spec stays accurate when new statuses are added.
+        @Schema(description = "Current status", implementation = TransactionStatus.class)
         String status,
 
         @Schema(description = "Bank-issued reference number, populated after webhook confirmation")
@@ -35,4 +40,5 @@ public record TransactionHistoryResponse(
         @Schema(description = "Timestamp when the transaction was created")
         @JsonProperty("created_at")
         LocalDateTime createdAt
+
 ) {}

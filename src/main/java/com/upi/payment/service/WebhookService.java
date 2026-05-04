@@ -1,11 +1,12 @@
 package com.upi.payment.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.upi.payment.dto.request.WebhookRequest;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.enums.WebhookStatus;
 import com.upi.payment.exception.InvalidSignatureException;
-import com.upi.payment.exception.ResourceNotFoundException;
-import com.upi.payment.repository.AccountRepository;
 import com.upi.payment.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,15 +22,24 @@ import java.util.UUID;
 public class WebhookService {
 
     private final TransactionRepository transactionRepository;
-    private final AccountRepository accountRepository;
     private final HmacService hmacService;
     private final LockService lockService;
     private final LedgerService ledgerService;
+    private final ObjectMapper objectMapper;
 
-    /** Synchronous HMAC check — called before the controller returns 200 OK. */
-    public void verifySignature(String rawPayload, String signature) {
+    /**
+     * Verifies the HMAC signature and deserializes the raw payload.
+     * Called synchronously by the controller so that signature failures and
+     * malformed JSON both produce an immediate error response before the 200 OK.
+     */
+    public WebhookRequest verifyAndDeserialize(String rawPayload, String signature) {
         if (!hmacService.verifySignature(rawPayload, signature)) {
             throw new InvalidSignatureException("Webhook signature mismatch");
+        }
+        try {
+            return objectMapper.readValue(rawPayload, WebhookRequest.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("Malformed webhook payload: " + e.getOriginalMessage());
         }
     }
 
@@ -53,9 +63,7 @@ public class WebhookService {
         try {
             lockService.acquireTransactionLock(transactionId);
 
-            Transaction tx = transactionRepository.findById(transactionId)
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Transaction not found: " + transactionId));
+            Transaction tx = transactionRepository.findByIdOrThrow(transactionId);
 
             if (tx.getStatus() != TransactionStatus.PENDING) {
                 log.warn("Ignoring duplicate webhook txId={} currentStatus={}",

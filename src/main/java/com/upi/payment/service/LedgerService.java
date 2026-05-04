@@ -1,7 +1,6 @@
 package com.upi.payment.service;
 
 import com.upi.payment.exception.InsufficientFundsException;
-import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.AccountRepository;
 import com.upi.payment.util.MoneyUtils;
 import lombok.RequiredArgsConstructor;
@@ -37,16 +36,12 @@ public class LedgerService {
     }
 
     private void mutateBalance(UUID accountId, BigDecimal delta) {
-        var account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Account not found: " + accountId));
+        var account = accountRepository.findByIdOrThrow(accountId);
 
         BigDecimal newBalance = MoneyUtils.add(account.getBalance(), delta);
 
         if (MoneyUtils.isNegative(newBalance)) {
-            throw new InsufficientFundsException(
-                    "Insufficient funds. Available: " + account.getBalance()
-                            + ", Required: " + delta.abs());
+            throw new InsufficientFundsException("Insufficient funds in sender account");
         }
 
         account.setBalance(newBalance);

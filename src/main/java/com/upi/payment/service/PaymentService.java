@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -33,9 +32,12 @@ public class PaymentService {
      */
     @Transactional
     public PaymentResponse initiatePayment(PaymentRequest request, String idempotencyKey) {
-        Optional<PaymentResponse> cached = getCachedResponse(idempotencyKey);
+        // Validate and normalise the key — keeps the controller free of business logic.
+        String trimmedKey = paymentValidator.validateIdempotencyKey(idempotencyKey);
+
+        Optional<PaymentResponse> cached = getCachedResponse(trimmedKey);
         if (cached.isPresent()) {
-            log.info("Idempotency cache hit (pre-lock) key={}", idempotencyKey);
+            log.info("Idempotency cache hit (pre-lock) key={}", trimmedKey);
             return cached.get();
         }
 
@@ -44,18 +46,22 @@ public class PaymentService {
         lockService.acquireAccountLock(request.getSenderId());
 
         // Second check inside the lock — handles two threads that both passed pre-lock
-        cached = getCachedResponse(idempotencyKey);
+        cached = getCachedResponse(trimmedKey);
         if (cached.isPresent()) {
-            log.info("Idempotency cache hit (post-lock) key={}", idempotencyKey);
+            log.info("Idempotency cache hit (post-lock) key={}", trimmedKey);
             return cached.get();
         }
 
         ledgerService.debit(request.getSenderId(), request.getAmount());
 
-        Transaction tx = createAndSaveTransaction(request);
-        PaymentResponse response = new PaymentResponse(tx.getTransactionId(), TransactionStatus.PENDING.name());
+        Transaction tx = transactionRepository.save(
+                Transaction.create(request.getSenderId(), request.getReceiverId(),
+                        request.getAmount(), request.getCurrency().name()));
 
-        idempotencyService.store(idempotencyKey, PaymentConstants.PAYMENTS_API_PATH,
+        PaymentResponse response = new PaymentResponse(tx.getTransactionId(),
+                TransactionStatus.PENDING.name());
+
+        idempotencyService.store(trimmedKey, PaymentConstants.PAYMENTS_API_PATH,
                 request, response, 201);
 
         log.info("Payment initiated txId={} sender={} receiver={} amount={}",
@@ -68,15 +74,5 @@ public class PaymentService {
     private Optional<PaymentResponse> getCachedResponse(String idempotencyKey) {
         return idempotencyService.findByKey(idempotencyKey)
                 .map(record -> idempotencyService.deserializeResponse(record, PaymentResponse.class));
-    }
-
-    private Transaction createAndSaveTransaction(PaymentRequest request) {
-        Transaction tx = new Transaction();
-        tx.setTransactionId(UUID.randomUUID());
-        tx.setSenderId(request.getSenderId());
-        tx.setReceiverId(request.getReceiverId());
-        tx.setAmount(request.getAmount());
-        tx.setStatus(TransactionStatus.PENDING);
-        return transactionRepository.save(tx);
     }
 }

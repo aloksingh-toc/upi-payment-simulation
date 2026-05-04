@@ -3,6 +3,7 @@ package com.upi.payment.service;
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.entity.Account;
 import com.upi.payment.enums.SupportedCurrency;
+import com.upi.payment.util.PaymentTestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,11 +32,6 @@ abstract class ServiceTestBase {
     }
 
     protected PaymentRequest buildPaymentRequest(UUID sender, UUID receiver, BigDecimal amount) {
-        PaymentRequest req = new PaymentRequest();
-        req.setSenderId(sender);
-        req.setReceiverId(receiver);
-        req.setAmount(amount);
-        req.setCurrency(SupportedCurrency.INR);
-        return req;
+        return PaymentTestFixtures.buildPaymentRequest(sender, receiver, amount);
     }
 }

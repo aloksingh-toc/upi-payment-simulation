@@ -1,7 +1,5 @@
 package com.upi.payment.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upi.payment.dto.request.WebhookRequest;
 import com.upi.payment.dto.response.ErrorResponse;
 import com.upi.payment.service.WebhookService;
@@ -31,7 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class WebhookController {
 
     private final WebhookService webhookService;
-    private final ObjectMapper objectMapper;
 
     @Operation(
             summary = "Receive UPI bank callback",
@@ -71,11 +68,9 @@ public class WebhookController {
                                       "bank_reference_number": "BANKREF123456"
                                     }
                                     """)))
-            @RequestBody String rawPayload) throws JsonProcessingException {
+            @RequestBody String rawPayload) {
 
-        webhookService.verifySignature(rawPayload, signature);
-
-        WebhookRequest request = objectMapper.readValue(rawPayload, WebhookRequest.class);
+        WebhookRequest request = webhookService.verifyAndDeserialize(rawPayload, signature);
 
         webhookService.processWebhook(
                 request.getTransactionId(),
