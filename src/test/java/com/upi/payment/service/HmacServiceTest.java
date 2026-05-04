@@ -13,7 +13,9 @@ class HmacServiceTest {
     @BeforeEach
     void setUp() {
         hmacService = new HmacService();
-        ReflectionTestUtils.setField(hmacService, "webhookSecret", "test-secret");
+        // Set the raw secret field then manually invoke @PostConstruct to build the SecretKeySpec.
+        ReflectionTestUtils.setField(hmacService, "webhookSecretRaw", "test-secret");
+        hmacService.init();
     }
 
     @Test
