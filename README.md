@@ -1,5 +1,7 @@
 # UPI Payment Gateway Simulation
 
+[![CI/CD Pipeline](https://github.com/aloksingh-toc/upi-payment-simulation/actions/workflows/main.yml/badge.svg)](https://github.com/aloksingh-toc/upi-payment-simulation/actions/workflows/main.yml)
+
 > **Note:** UPI (Unified Payments Interface) is a real-time payment system regulated by the [Reserve Bank of India (RBI)](https://www.rbi.org.in) and operated by [NPCI](https://www.npci.org.in). This simulation is scoped to the Indian financial ecosystem — it uses INR as the only supported currency and follows UPI's payment flow conventions. It is intended for use within India.
 
 A production-grade REST API simulating a UPI payment gateway. Built with Java 21, Spring Boot 3, and PostgreSQL.
