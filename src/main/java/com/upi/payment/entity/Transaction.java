@@ -71,11 +71,25 @@ public class Transaction {
     }
 
     // Field setters retained for JPA and test usage
-    public void setTransactionId(UUID transactionId)  { this.transactionId = transactionId; }
-    public void setSenderId(UUID senderId)             { this.senderId = senderId; }
-    public void setReceiverId(UUID receiverId)         { this.receiverId = receiverId; }
-    public void setAmount(BigDecimal amount)           { this.amount = amount; }
-    public void setCurrency(String currency)           { this.currency = currency; }
+    public void setTransactionId(UUID transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    public void setSenderId(UUID senderId) {
+        this.senderId = senderId;
+    }
+
+    public void setReceiverId(UUID receiverId) {
+        this.receiverId = receiverId;
+    }
+
+    public void setAmount(BigDecimal amount) {
+        this.amount = amount;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
 
     @PrePersist
     protected void onCreate() {
