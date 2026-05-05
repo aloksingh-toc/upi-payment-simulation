@@ -146,6 +146,16 @@ WebhookController
     └── WebhookService          (@Async — acquires tx lock, applies credit)
 ```
 
+## Project Status
+
+| Area | Status |
+|---|---|
+| Build | [![CI/CD Pipeline](https://github.com/aloksingh-toc/upi-payment-simulation/actions/workflows/main.yml/badge.svg)](https://github.com/aloksingh-toc/upi-payment-simulation/actions/workflows/main.yml) |
+| Test coverage | Unit + Integration (Testcontainers) |
+| Code style | Checkstyle enforced |
+| Security scan | OWASP Dependency-Check |
+| Java version | 21 (LTS) |
+
 ## Security Notes
 
 - API key comparison uses `MessageDigest.isEqual` (constant-time, prevents timing attacks)
