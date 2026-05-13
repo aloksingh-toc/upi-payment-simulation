@@ -16,9 +16,8 @@ public final class PaymentConstants {
     public static final String WEBHOOKS_API_PATH  = "/api/v1/webhooks";
 
     // HTTP header names
-    public static final String IDEMPOTENCY_KEY_HEADER     = "Idempotency-Key";
-    public static final String WEBHOOK_SIGNATURE_HEADER   = "X-Webhook-Signature";
-    public static final String X_FORWARDED_FOR_HEADER     = "X-Forwarded-For";
+    public static final String IDEMPOTENCY_KEY_HEADER   = "Idempotency-Key";
+    public static final String WEBHOOK_SIGNATURE_HEADER = "X-Webhook-Signature";
 
     // Cryptography constants
     public static final String HMAC_ALGORITHM = "HmacSHA256";

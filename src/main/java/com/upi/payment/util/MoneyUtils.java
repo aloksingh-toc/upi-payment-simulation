@@ -19,15 +19,7 @@ public final class MoneyUtils {
         return round(a.add(b));
     }
 
-    public static BigDecimal subtract(BigDecimal a, BigDecimal b) {
-        return round(a.subtract(b));
-    }
-
     public static boolean isNegative(BigDecimal amount) {
         return amount.signum() < 0;
-    }
-
-    public static boolean isSufficient(BigDecimal balance, BigDecimal required) {
-        return balance.compareTo(required) >= 0;
     }
 }
