@@ -3,6 +3,7 @@ package com.upi.payment.service;
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.exception.ResourceNotFoundException;
 import com.upi.payment.repository.AccountRepository;
+import com.upi.payment.util.PaymentConstants;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -56,5 +57,44 @@ class PaymentValidatorTest extends ServiceTestBase {
                 paymentValidator.validate(buildPaymentRequest(senderId, receiverId, BigDecimal.TEN)))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Receiver");
+    }
+
+    // -------------------------------------------------------------------------
+    // validateIdempotencyKey
+    // -------------------------------------------------------------------------
+
+    @Test
+    void validateIdempotencyKey_validKey_returnsTrimmed() {
+        String result = paymentValidator.validateIdempotencyKey("  my-key-123  ");
+        assertThat(result).isEqualTo("my-key-123");
+    }
+
+    @Test
+    void validateIdempotencyKey_nullKey_throws() {
+        assertThatThrownBy(() -> paymentValidator.validateIdempotencyKey(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Idempotency-Key");
+    }
+
+    @Test
+    void validateIdempotencyKey_blankKey_throws() {
+        assertThatThrownBy(() -> paymentValidator.validateIdempotencyKey("   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Idempotency-Key");
+    }
+
+    @Test
+    void validateIdempotencyKey_tooLongKey_throws() {
+        String tooLong = "a".repeat(PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH + 1);
+        assertThatThrownBy(() -> paymentValidator.validateIdempotencyKey(tooLong))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Idempotency-Key");
+    }
+
+    @Test
+    void validateIdempotencyKey_exactMaxLength_passes() {
+        String exactMax = "a".repeat(PaymentConstants.IDEMPOTENCY_KEY_MAX_LENGTH);
+        assertThatNoException().isThrownBy(() ->
+                paymentValidator.validateIdempotencyKey(exactMax));
     }
 }
