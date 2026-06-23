@@ -4,19 +4,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
 @Entity
 @Table(name = "accounts")
-public class Account {
+public class Account extends AuditableEntity {
 
     @Id
     @Column(name = "account_id")
@@ -33,6 +31,9 @@ public class Account {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
+    @Column(name = "vpa")
+    private String vpa;
+
     public void setAccountId(UUID accountId) {
         this.accountId = accountId;
     }
@@ -45,24 +46,14 @@ public class Account {
         this.currency = currency;
     }
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Setter
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    public void setVpa(String vpa) {
+        this.vpa = vpa;
+    }
 
     @PrePersist
-    protected void onCreate() {
+    protected void onAccountCreate() {
         if (accountId == null) {
             accountId = UUID.randomUUID();
         }
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }

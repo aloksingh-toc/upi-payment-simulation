@@ -10,6 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.Locale;
 
 @Service
 public class HmacService {
@@ -44,11 +45,15 @@ public class HmacService {
         }
     }
 
-    /** Constant-time comparison prevents timing-attack leakage. */
+    /**
+     * Constant-time comparison prevents timing-attack leakage.
+     * Hex case is normalised first — {@code computeHmac} always emits lowercase,
+     * but callers may legitimately send uppercase hex.
+     */
     public boolean verifySignature(String payload, String providedSignature) {
         String expected = computeHmac(payload);
         return MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.UTF_8),
-                providedSignature.getBytes(StandardCharsets.UTF_8));
+                providedSignature.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
     }
 }

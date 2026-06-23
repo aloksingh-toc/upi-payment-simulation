@@ -27,6 +27,7 @@ class WebhookServiceTest extends ServiceTestBase {
     @Mock private LockService lockService;
     @Mock private LedgerService ledgerService;
     @Mock private ObjectMapper objectMapper;
+    @Mock private ShortLinkService shortLinkService;
 
     @InjectMocks private WebhookService webhookService;
 

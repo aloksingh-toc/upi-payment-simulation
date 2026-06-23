@@ -3,6 +3,7 @@ package com.upi.payment.service;
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.dto.response.PaymentResponse;
 import com.upi.payment.entity.IdempotencyRecord;
+import com.upi.payment.entity.ReceiptShortLink;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.exception.InsufficientFundsException;
@@ -29,6 +30,7 @@ class PaymentServiceTest extends ServiceTestBase {
     @Mock private LockService lockService;
     @Mock private LedgerService ledgerService;
     @Mock private PaymentValidator paymentValidator;
+    @Mock private ShortLinkService shortLinkService;
 
     @InjectMocks private PaymentService paymentService;
 
@@ -40,6 +42,7 @@ class PaymentServiceTest extends ServiceTestBase {
         when(paymentValidator.validateIdempotencyKey(idemKey)).thenReturn(idemKey);
         when(idempotencyService.findByKey(idemKey)).thenReturn(Optional.empty());
         when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(shortLinkService.create(any())).thenReturn(ReceiptShortLink.create("aB3dE9fG", UUID.randomUUID()));
 
         PaymentResponse response = paymentService.initiatePayment(req, idemKey);
 

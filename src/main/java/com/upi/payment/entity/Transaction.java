@@ -7,19 +7,17 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Getter
 @Entity
 @Table(name = "transactions")
-public class Transaction {
+public class Transaction extends AuditableEntity {
 
     @Id
     @Column(name = "transaction_id")
@@ -46,13 +44,6 @@ public class Transaction {
     @Setter
     @Column(name = "bank_reference_number")
     private String bankReferenceNumber;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Setter
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
 
     /**
      * Preferred constructor — keeps entity construction logic inside the entity
@@ -92,16 +83,9 @@ public class Transaction {
     }
 
     @PrePersist
-    protected void onCreate() {
+    protected void onTransactionCreate() {
         if (transactionId == null) {
             transactionId = UUID.randomUUID();
         }
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }

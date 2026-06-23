@@ -48,11 +48,12 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    /** Webhook and Swagger UI endpoints do not use Bearer auth — skip this filter for those paths. */
+    /** Webhook, receipt, and Swagger UI endpoints do not use Bearer auth — skip this filter for those paths. */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
         return uri.startsWith("/api/v1/webhooks/")
+                || uri.startsWith("/receipt/")
                 || uri.startsWith("/swagger-ui")
                 || uri.startsWith("/v3/api-docs");
     }

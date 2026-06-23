@@ -33,6 +33,7 @@ public class RefundService {
     private final TransactionRepository transactionRepository;
     private final LockService lockService;
     private final LedgerService ledgerService;
+    private final ShortLinkService shortLinkService;
 
     @Transactional
     public RefundResponse refund(UUID transactionId) {
@@ -56,6 +57,7 @@ public class RefundService {
 
         tx.setStatus(TransactionStatus.REFUNDED);
         transactionRepository.save(tx);
+        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.REFUNDED);
 
         log.info("Refund processed txId={} amount={} refunded-to={}",
                 transactionId, tx.getAmount(), tx.getSenderId());

@@ -24,6 +24,7 @@ class RefundServiceTest extends ServiceTestBase {
     @Mock private TransactionRepository transactionRepository;
     @Mock private LockService lockService;
     @Mock private LedgerService ledgerService;
+    @Mock private ShortLinkService shortLinkService;
 
     @InjectMocks private RefundService refundService;
 
