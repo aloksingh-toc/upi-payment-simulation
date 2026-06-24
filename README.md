@@ -9,6 +9,8 @@ A production-grade REST API simulating a UPI payment gateway. Built with Java 21
 ## Features
 
 - **Payment initiation** with idempotency — duplicate requests return the same response
+- **VPA (Virtual Payment Address)** support — pay to `alice@upi` instead of a raw account ID
+- **E-receipts** — every payment gets a public, unauthenticated short-link receipt that tracks settlement status
 - **Webhook processing** with HMAC-SHA256 signature verification and async handling
 - **Distributed locking** via PostgreSQL advisory locks to prevent double-credits
 - **ACID ledger** — debit and transaction record saved atomically; credit applied on webhook confirmation
@@ -38,6 +40,7 @@ A production-grade REST API simulating a UPI payment gateway. Built with Java 21
 | `GET` | `/api/v1/accounts/{id}/balance` | Bearer API key | Get account balance |
 | `GET` | `/api/v1/accounts/{id}/transactions` | Bearer API key | Paginated transaction history |
 | `POST` | `/api/v1/webhooks/upi` | HMAC-SHA256 | Receive bank webhook |
+| `GET` | `/receipt/{token}` | None | Look up a payment's receipt by short-link token |
 | `GET` | `/actuator/health` | None | Health check |
 
 ### Initiate Payment
@@ -55,6 +58,55 @@ Content-Type: application/json
   "currency": "INR"
 }
 ```
+
+The response includes a `receipt_url` that can be polled (no auth required) to track settlement:
+
+```json
+{
+  "transaction_id": "<uuid>",
+  "status": "PENDING",
+  "receipt_url": "/receipt/aB3dE9fG"
+}
+```
+
+### Pay by VPA instead of account ID
+
+Send `receiver_vpa` instead of `receiver_id` — exactly one of the two must be supplied:
+
+```http
+POST /api/v1/payments
+Authorization: Bearer <API_KEY>
+Idempotency-Key: <uuid>
+Content-Type: application/json
+
+{
+  "sender_id": "a0000000-0000-0000-0000-000000000001",
+  "receiver_vpa": "bob@upi",
+  "amount": "500.00",
+  "currency": "INR"
+}
+```
+
+The VPA is resolved to the underlying account before payment validation runs; an unknown VPA returns `404 Not Found`.
+
+### Check a receipt
+
+```http
+GET /receipt/aB3dE9fG
+```
+
+```json
+{
+  "transaction_id": "<uuid>",
+  "status": "SUCCESS",
+  "amount": "500.00",
+  "currency": "INR",
+  "created_at": "2026-06-23T10:15:00",
+  "confirmed_at": "2026-06-23T10:15:04"
+}
+```
+
+The receipt's `status` updates automatically as the underlying transaction settles (`PENDING` → `SUCCESS`/`FAILED`, or `REFUNDED` after a refund).
 
 ### Webhook (bank callback)
 
@@ -136,14 +188,19 @@ GitHub Actions runs on every push to `main` or `develop`:
 ```
 PaymentController
     └── PaymentService          (idempotency check → validate → lock → debit → save)
-            ├── PaymentValidator    (self-transfer, sender/receiver existence)
-            ├── LockService         (facade over DistributedLock interface)
-            ├── LedgerService       (debit / credit via MoneyUtils)
-            └── IdempotencyService  (store & retrieve with TOCTOU-safe double-check)
+            ├── PaymentValidator       (self-transfer, sender/receiver existence, VPA resolution)
+            │       └── VpaResolutionService  (resolves receiver_vpa → account ID)
+            ├── LockService            (facade over DistributedLock interface)
+            ├── LedgerService          (debit / credit via MoneyUtils)
+            ├── IdempotencyService     (store & retrieve with TOCTOU-safe double-check)
+            └── ShortLinkService       (creates the receipt short-link token)
 
 WebhookController
     └── HmacService             (constant-time HMAC-SHA256 verification)
-    └── WebhookService          (@Async — acquires tx lock, applies credit)
+    └── WebhookService          (@Async — acquires tx lock, applies credit, updates receipt status)
+
+ReceiptController              (public, unauthenticated — GET /receipt/{token})
+    └── ShortLinkService        (token lookup, status updates from webhook/refund flows)
 ```
 
 ## Project Status

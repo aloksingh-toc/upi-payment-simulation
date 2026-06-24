@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.dto.response.BalanceResponse;
 import com.upi.payment.dto.response.PaymentResponse;
+import com.upi.payment.dto.response.ReceiptResponse;
 import com.upi.payment.dto.response.RefundResponse;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.repository.AccountRepository;
@@ -66,6 +67,42 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(first.getBody().transactionId())
                 .isEqualTo(second.getBody().transactionId());
+    }
+
+    @Test
+    void initiatePayment_withReceiverVpa_resolvesAndReturnsCreated() {
+        PaymentRequest req = buildPaymentRequest(SENDER_ID, null, new BigDecimal("75.00"));
+        req.setReceiverVpa("bob@upi");
+
+        HttpHeaders headers = apiHeaders();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        ResponseEntity<PaymentResponse> response = restTemplate.exchange(
+                "/api/v1/payments",
+                HttpMethod.POST,
+                new HttpEntity<>(req, headers),
+                PaymentResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo("PENDING");
+    }
+
+    @Test
+    void initiatePayment_withUnknownReceiverVpa_returns404() {
+        PaymentRequest req = buildPaymentRequest(SENDER_ID, null, new BigDecimal("75.00"));
+        req.setReceiverVpa("nobody@upi");
+
+        HttpHeaders headers = apiHeaders();
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        ResponseEntity<Void> response = restTemplate.exchange(
+                "/api/v1/payments",
+                HttpMethod.POST,
+                new HttpEntity<>(req, headers),
+                Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -217,6 +254,66 @@ class PaymentIntegrationTest extends AbstractIntegrationTest {
                 HttpMethod.POST,
                 new HttpEntity<>(apiHeaders()),
                 Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    // -----------------------------------------------------------------------
+    // Receipt endpoint
+    // -----------------------------------------------------------------------
+
+    /**
+     * Full receipt lifecycle:
+     * 1. Initiate payment → response includes a receiptUrl
+     * 2. GET the receipt before settlement → PENDING
+     * 3. Send a valid SUCCESS webhook → async processing credits receiver
+     * 4. Awaitility polls until the receipt flips to SUCCESS
+     */
+    @Test
+    void receipt_fullLifecycle_updatesToSuccessAfterWebhook() throws Exception {
+        PaymentRequest req = buildPaymentRequest(SENDER_ID, RECEIVER_ID, new BigDecimal("400.00"));
+        HttpHeaders apiHdr = apiHeaders();
+        apiHdr.set("Idempotency-Key", UUID.randomUUID().toString());
+
+        PaymentResponse payment = restTemplate.exchange(
+                "/api/v1/payments", HttpMethod.POST,
+                new HttpEntity<>(req, apiHdr), PaymentResponse.class).getBody();
+
+        assertThat(payment.receiptUrl()).isNotBlank();
+        String token = payment.receiptUrl().substring(payment.receiptUrl().lastIndexOf('/') + 1);
+
+        ResponseEntity<ReceiptResponse> pendingReceipt = restTemplate.exchange(
+                payment.receiptUrl(), HttpMethod.GET,
+                new HttpEntity<>(new HttpHeaders()), ReceiptResponse.class);
+        assertThat(pendingReceipt.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(pendingReceipt.getBody().status()).isEqualTo("PENDING");
+
+        String payload = objectMapper.writeValueAsString(
+                new WebhookPayload(payment.transactionId(), "SUCCESS", "BANKREF-RECEIPT"));
+        String sig = hmacService.computeHmac(payload);
+
+        HttpHeaders whHeaders = new HttpHeaders();
+        whHeaders.setContentType(MediaType.APPLICATION_JSON);
+        whHeaders.set("X-Webhook-Signature", sig);
+        restTemplate.exchange("/api/v1/webhooks/upi", HttpMethod.POST,
+                new HttpEntity<>(payload, whHeaders), Void.class);
+
+        Awaitility.await()
+                .atMost(Duration.ofSeconds(10))
+                .pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> {
+                    ResponseEntity<ReceiptResponse> settledReceipt = restTemplate.exchange(
+                            "/receipt/" + token, HttpMethod.GET,
+                            new HttpEntity<>(new HttpHeaders()), ReceiptResponse.class);
+                    assertThat(settledReceipt.getBody().status()).isEqualTo("SUCCESS");
+                });
+    }
+
+    @Test
+    void receipt_unknownToken_returns404() {
+        ResponseEntity<Void> response = restTemplate.exchange(
+                "/receipt/doesnotexist", HttpMethod.GET,
+                new HttpEntity<>(new HttpHeaders()), Void.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }

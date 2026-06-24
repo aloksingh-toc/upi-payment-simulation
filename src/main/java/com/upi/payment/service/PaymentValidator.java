@@ -17,11 +17,35 @@ import org.springframework.stereotype.Service;
 public class PaymentValidator {
 
     private final AccountRepository accountRepository;
+    private final VpaResolutionService vpaResolutionService;
 
+    /**
+     * Validates business rules for the request.
+     *
+     * <p><b>Note:</b> this also resolves {@code receiverVpa} into {@code receiverId} on the
+     * passed-in {@code request}, since every subsequent rule (self-transfer, account
+     * existence) needs a concrete receiver ID to check against. Callers must not rely on
+     * {@code request.getReceiverId()} being unchanged after this call.
+     */
     public void validate(PaymentRequest request) {
+        resolveReceiverVpa(request);
         rejectSelfTransfer(request);
         requireSenderExists(request);
         requireReceiverExists(request);
+    }
+
+    /** Resolves {@code receiverVpa} to an account ID and writes it back onto {@code request}. */
+    private void resolveReceiverVpa(PaymentRequest request) {
+        boolean hasReceiverId = request.getReceiverId() != null;
+        boolean hasReceiverVpa = request.getReceiverVpa() != null && !request.getReceiverVpa().isBlank();
+
+        if (hasReceiverId == hasReceiverVpa) {
+            throw new IllegalArgumentException(
+                    "Exactly one of receiver_id or receiver_vpa must be supplied");
+        }
+        if (hasReceiverVpa) {
+            request.setReceiverId(vpaResolutionService.resolve(request.getReceiverVpa()));
+        }
     }
 
     /**

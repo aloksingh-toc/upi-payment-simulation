@@ -5,6 +5,7 @@ import com.upi.payment.exception.ResourceNotFoundException;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -15,4 +16,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
         return findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Account not found: " + id));
     }
+
+    Optional<Account> findByVpa(String vpa);
 }

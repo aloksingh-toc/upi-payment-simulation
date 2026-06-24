@@ -14,11 +14,19 @@ public record PaymentResponse(
         String status,
 
         @Schema(description = "Human-readable result message")
-        String message
+        String message,
+
+        @Schema(description = "Public receipt URL — status updates automatically on settlement")
+        String receiptUrl
 
 ) {
-    /** Convenience constructor — sets the default success message. */
+    /** Convenience constructor — sets the default success message, no receipt yet. */
     public PaymentResponse(UUID transactionId, String status) {
-        this(transactionId, status, "Payment initiated successfully");
+        this(transactionId, status, "Payment initiated successfully", null);
+    }
+
+    /** Convenience constructor — sets the default success message with a receipt URL. */
+    public PaymentResponse(UUID transactionId, String status, String receiptUrl) {
+        this(transactionId, status, "Payment initiated successfully", receiptUrl);
     }
 }

@@ -26,6 +26,7 @@ public class WebhookService {
     private final LockService lockService;
     private final LedgerService ledgerService;
     private final ObjectMapper objectMapper;
+    private final ShortLinkService shortLinkService;
 
     /**
      * Verifies the HMAC signature and deserializes the raw payload.
@@ -91,6 +92,7 @@ public class WebhookService {
         tx.setStatus(TransactionStatus.SUCCESS);
         tx.setBankReferenceNumber(bankRef);
         transactionRepository.save(tx);
+        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.SUCCESS);
 
         log.info("Payment SUCCESS txId={} amount={} credited receiver={}",
                 tx.getTransactionId(), tx.getAmount(), tx.getReceiverId());
@@ -103,6 +105,7 @@ public class WebhookService {
         tx.setStatus(TransactionStatus.FAILED);
         tx.setBankReferenceNumber(bankRef);
         transactionRepository.save(tx);
+        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.FAILED);
 
         log.info("Payment FAILED txId={} amount={} refunded sender={}",
                 tx.getTransactionId(), tx.getAmount(), tx.getSenderId());

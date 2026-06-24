@@ -2,6 +2,7 @@ package com.upi.payment.service;
 
 import com.upi.payment.dto.request.PaymentRequest;
 import com.upi.payment.dto.response.PaymentResponse;
+import com.upi.payment.entity.ReceiptShortLink;
 import com.upi.payment.entity.Transaction;
 import com.upi.payment.enums.TransactionStatus;
 import com.upi.payment.repository.TransactionRepository;
@@ -23,6 +24,7 @@ public class PaymentService {
     private final LockService lockService;
     private final LedgerService ledgerService;
     private final PaymentValidator paymentValidator;
+    private final ShortLinkService shortLinkService;
 
     /**
      * Initiates a payment within a single ACID transaction.
@@ -58,8 +60,10 @@ public class PaymentService {
                 Transaction.create(request.getSenderId(), request.getReceiverId(),
                         request.getAmount(), request.getCurrency().name()));
 
+        ReceiptShortLink receiptLink = shortLinkService.create(tx);
+
         PaymentResponse response = new PaymentResponse(tx.getTransactionId(),
-                TransactionStatus.PENDING.name());
+                TransactionStatus.PENDING.name(), "/receipt/" + receiptLink.getToken());
 
         idempotencyService.store(trimmedKey, PaymentConstants.PAYMENTS_API_PATH,
                 request, response, 201);

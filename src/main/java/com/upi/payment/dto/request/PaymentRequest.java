@@ -15,8 +15,9 @@ public class PaymentRequest {
     @NotNull(message = "sender_id is required")
     private UUID senderId;
 
-    @NotNull(message = "receiver_id is required")
     private UUID receiverId;
+
+    private String receiverVpa;
 
     @NotNull(message = "amount is required")
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")

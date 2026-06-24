@@ -16,6 +16,7 @@ import static org.mockito.Mockito.*;
 class PaymentValidatorTest extends ServiceTestBase {
 
     @Mock private AccountRepository accountRepository;
+    @Mock private VpaResolutionService vpaResolutionService;
 
     @InjectMocks private PaymentValidator paymentValidator;
 
@@ -57,6 +58,59 @@ class PaymentValidatorTest extends ServiceTestBase {
                 paymentValidator.validate(buildPaymentRequest(senderId, receiverId, BigDecimal.TEN)))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Receiver");
+    }
+
+    // -------------------------------------------------------------------------
+    // VPA resolution
+    // -------------------------------------------------------------------------
+
+    @Test
+    void validate_receiverVpa_resolvesAndPasses() {
+        PaymentRequest request = buildPaymentRequest(senderId, null, BigDecimal.TEN);
+        request.setReceiverVpa("alice@upi");
+
+        when(vpaResolutionService.resolve("alice@upi")).thenReturn(receiverId);
+        when(accountRepository.existsById(senderId)).thenReturn(true);
+        when(accountRepository.existsById(receiverId)).thenReturn(true);
+
+        assertThatNoException().isThrownBy(() -> paymentValidator.validate(request));
+        assertThat(request.getReceiverId()).isEqualTo(receiverId);
+    }
+
+    @Test
+    void validate_unknownReceiverVpa_throws() {
+        PaymentRequest request = buildPaymentRequest(senderId, null, BigDecimal.TEN);
+        request.setReceiverVpa("unknown@upi");
+
+        when(vpaResolutionService.resolve("unknown@upi"))
+                .thenThrow(new ResourceNotFoundException("No account found for VPA: unknown@upi"));
+
+        assertThatThrownBy(() -> paymentValidator.validate(request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("unknown@upi");
+    }
+
+    @Test
+    void validate_bothReceiverIdAndVpaSupplied_throws() {
+        PaymentRequest request = buildPaymentRequest(senderId, receiverId, BigDecimal.TEN);
+        request.setReceiverVpa("alice@upi");
+
+        assertThatThrownBy(() -> paymentValidator.validate(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Exactly one");
+
+        verifyNoInteractions(vpaResolutionService);
+    }
+
+    @Test
+    void validate_neitherReceiverIdNorVpaSupplied_throws() {
+        PaymentRequest request = buildPaymentRequest(senderId, null, BigDecimal.TEN);
+
+        assertThatThrownBy(() -> paymentValidator.validate(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Exactly one");
+
+        verifyNoInteractions(vpaResolutionService);
     }
 
     // -------------------------------------------------------------------------
