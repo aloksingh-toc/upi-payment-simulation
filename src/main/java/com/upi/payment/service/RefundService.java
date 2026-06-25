@@ -32,8 +32,7 @@ public class RefundService {
 
     private final TransactionRepository transactionRepository;
     private final LockService lockService;
-    private final LedgerService ledgerService;
-    private final ShortLinkService shortLinkService;
+    private final SettlementService settlementService;
 
     @Transactional
     public RefundResponse refund(UUID transactionId) {
@@ -49,15 +48,9 @@ public class RefundService {
         }
 
         // Reverse the money: debit receiver first, then credit sender.
-        lockService.acquireAccountLock(tx.getReceiverId());
-        ledgerService.debit(tx.getReceiverId(), tx.getAmount());
-
-        lockService.acquireAccountLock(tx.getSenderId());
-        ledgerService.credit(tx.getSenderId(), tx.getAmount());
-
-        tx.setStatus(TransactionStatus.REFUNDED);
-        transactionRepository.save(tx);
-        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.REFUNDED);
+        settlementService.settle(tx, TransactionStatus.REFUNDED, null,
+                SettlementService.LedgerStep.debit(tx.getReceiverId()),
+                SettlementService.LedgerStep.credit(tx.getSenderId()));
 
         log.info("Refund processed txId={} amount={} refunded-to={}",
                 transactionId, tx.getAmount(), tx.getSenderId());

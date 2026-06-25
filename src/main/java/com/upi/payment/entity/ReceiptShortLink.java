@@ -55,7 +55,10 @@ public class ReceiptShortLink {
 
     @PreUpdate
     protected void onUpdate() {
-        if (status != TransactionStatus.PENDING) {
+        // Only set on the first transition out of PENDING — confirmedAt records when the
+        // transaction first settled, not the time of its most recent status change (e.g. a
+        // later refund must not overwrite the original confirmation timestamp).
+        if (status != TransactionStatus.PENDING && confirmedAt == null) {
             confirmedAt = LocalDateTime.now();
         }
     }

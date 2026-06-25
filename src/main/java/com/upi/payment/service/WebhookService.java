@@ -24,9 +24,8 @@ public class WebhookService {
     private final TransactionRepository transactionRepository;
     private final HmacService hmacService;
     private final LockService lockService;
-    private final LedgerService ledgerService;
     private final ObjectMapper objectMapper;
-    private final ShortLinkService shortLinkService;
+    private final SettlementService settlementService;
 
     /**
      * Verifies the HMAC signature and deserializes the raw payload.
@@ -86,26 +85,16 @@ public class WebhookService {
     }
 
     private void creditReceiver(Transaction tx, String bankRef) {
-        lockService.acquireAccountLock(tx.getReceiverId());
-        ledgerService.credit(tx.getReceiverId(), tx.getAmount());
-
-        tx.setStatus(TransactionStatus.SUCCESS);
-        tx.setBankReferenceNumber(bankRef);
-        transactionRepository.save(tx);
-        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.SUCCESS);
+        settlementService.settle(tx, TransactionStatus.SUCCESS, bankRef,
+                SettlementService.LedgerStep.credit(tx.getReceiverId()));
 
         log.info("Payment SUCCESS txId={} amount={} credited receiver={}",
                 tx.getTransactionId(), tx.getAmount(), tx.getReceiverId());
     }
 
     private void refundSender(Transaction tx, String bankRef) {
-        lockService.acquireAccountLock(tx.getSenderId());
-        ledgerService.credit(tx.getSenderId(), tx.getAmount());
-
-        tx.setStatus(TransactionStatus.FAILED);
-        tx.setBankReferenceNumber(bankRef);
-        transactionRepository.save(tx);
-        shortLinkService.updateStatus(tx.getTransactionId(), TransactionStatus.FAILED);
+        settlementService.settle(tx, TransactionStatus.FAILED, bankRef,
+                SettlementService.LedgerStep.credit(tx.getSenderId()));
 
         log.info("Payment FAILED txId={} amount={} refunded sender={}",
                 tx.getTransactionId(), tx.getAmount(), tx.getSenderId());

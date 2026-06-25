@@ -17,7 +17,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class WebhookServiceTest extends ServiceTestBase {
@@ -25,9 +24,8 @@ class WebhookServiceTest extends ServiceTestBase {
     @Mock private TransactionRepository transactionRepository;
     @Mock private HmacService hmacService;
     @Mock private LockService lockService;
-    @Mock private LedgerService ledgerService;
     @Mock private ObjectMapper objectMapper;
-    @Mock private ShortLinkService shortLinkService;
+    @Mock private SettlementService settlementService;
 
     @InjectMocks private WebhookService webhookService;
 
@@ -55,34 +53,31 @@ class WebhookServiceTest extends ServiceTestBase {
     // ── processWebhook — SUCCESS ─────────────────────────────────────────────
 
     @Test
-    void processWebhook_success_creditsReceiverAndMarksSuccess() {
+    void processWebhook_success_delegatesSettlementToCreditReceiver() {
         UUID txId = UUID.randomUUID();
         Transaction tx = pendingTransaction(txId, senderId, receiverId, new BigDecimal("300.00"));
 
         when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
-        when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         webhookService.processWebhook(txId, WebhookStatus.SUCCESS, "BANKREF-001");
 
-        verify(ledgerService).credit(receiverId, new BigDecimal("300.00"));
-        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.SUCCESS);
-        assertThat(tx.getBankReferenceNumber()).isEqualTo("BANKREF-001");
+        verify(settlementService).settle(tx, TransactionStatus.SUCCESS, "BANKREF-001",
+                SettlementService.LedgerStep.credit(receiverId));
     }
 
     // ── processWebhook — FAILED ──────────────────────────────────────────────
 
     @Test
-    void processWebhook_failed_refundsSenderAndMarksFailed() {
+    void processWebhook_failed_delegatesSettlementToRefundSender() {
         UUID txId = UUID.randomUUID();
         Transaction tx = pendingTransaction(txId, senderId, receiverId, new BigDecimal("200.00"));
 
         when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
-        when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         webhookService.processWebhook(txId, WebhookStatus.FAILED, "BANKREF-002");
 
-        verify(ledgerService).credit(senderId, new BigDecimal("200.00"));
-        assertThat(tx.getStatus()).isEqualTo(TransactionStatus.FAILED);
+        verify(settlementService).settle(tx, TransactionStatus.FAILED, "BANKREF-002",
+                SettlementService.LedgerStep.credit(senderId));
     }
 
     // ── processWebhook — duplicate ───────────────────────────────────────────
@@ -97,8 +92,7 @@ class WebhookServiceTest extends ServiceTestBase {
 
         webhookService.processWebhook(txId, WebhookStatus.SUCCESS, "BANKREF-DUP");
 
-        verifyNoInteractions(ledgerService);
-        verify(transactionRepository, never()).save(any());
+        verifyNoInteractions(settlementService);
     }
 
     // ── processWebhook — transaction not found ───────────────────────────────
@@ -113,7 +107,7 @@ class WebhookServiceTest extends ServiceTestBase {
         assertThatNoException().isThrownBy(() ->
                 webhookService.processWebhook(txId, WebhookStatus.SUCCESS, "REF"));
 
-        verifyNoInteractions(ledgerService);
+        verifyNoInteractions(settlementService);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

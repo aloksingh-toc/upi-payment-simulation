@@ -17,14 +17,14 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class RefundServiceTest extends ServiceTestBase {
 
     @Mock private TransactionRepository transactionRepository;
     @Mock private LockService lockService;
-    @Mock private LedgerService ledgerService;
-    @Mock private ShortLinkService shortLinkService;
+    @Mock private SettlementService settlementService;
 
     @InjectMocks private RefundService refundService;
 
@@ -44,6 +44,14 @@ class RefundServiceTest extends ServiceTestBase {
         return tx;
     }
 
+    /** Mimics the real SettlementService side effect of flipping the transaction's status. */
+    private void stubSettleToApplyStatus(Transaction tx, TransactionStatus newStatus) {
+        doAnswer(inv -> {
+            tx.setStatus(newStatus);
+            return null;
+        }).when(settlementService).settle(eq(tx), eq(newStatus), any(), any(), any());
+    }
+
     // -------------------------------------------------------------------------
     // Happy path
     // -------------------------------------------------------------------------
@@ -54,7 +62,7 @@ class RefundServiceTest extends ServiceTestBase {
         Transaction tx = buildTransaction(txId, TransactionStatus.SUCCESS);
 
         when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
-        when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        stubSettleToApplyStatus(tx, TransactionStatus.REFUNDED);
 
         RefundResponse response = refundService.refund(txId);
 
@@ -65,18 +73,17 @@ class RefundServiceTest extends ServiceTestBase {
     }
 
     @Test
-    void refund_debitsReceiverAndCreditsSender() {
+    void refund_delegatesToSettlementServiceWithDebitReceiverThenCreditSender() {
         UUID txId = UUID.randomUUID();
         Transaction tx = buildTransaction(txId, TransactionStatus.SUCCESS);
-        BigDecimal amount = tx.getAmount();
 
         when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
-        when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         refundService.refund(txId);
 
-        verify(ledgerService).debit(receiverId, amount);
-        verify(ledgerService).credit(senderId, amount);
+        verify(settlementService).settle(tx, TransactionStatus.REFUNDED, null,
+                SettlementService.LedgerStep.debit(receiverId),
+                SettlementService.LedgerStep.credit(senderId));
     }
 
     // -------------------------------------------------------------------------
@@ -84,20 +91,18 @@ class RefundServiceTest extends ServiceTestBase {
     // -------------------------------------------------------------------------
 
     @Test
-    void refund_acquiresLocksInCorrectOrder() {
+    void refund_acquiresTransactionLockBeforeDelegatingSettlement() {
         UUID txId = UUID.randomUUID();
         Transaction tx = buildTransaction(txId, TransactionStatus.SUCCESS);
 
         when(transactionRepository.findByIdOrThrow(txId)).thenReturn(tx);
-        when(transactionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         refundService.refund(txId);
 
-        // Correct deadlock-free ordering: transaction lock → receiver lock → sender lock
-        InOrder order = inOrder(lockService);
+        // Transaction lock is acquired before account-level locking (handled inside SettlementService).
+        InOrder order = inOrder(lockService, settlementService);
         order.verify(lockService).acquireTransactionLock(txId);
-        order.verify(lockService).acquireAccountLock(receiverId);
-        order.verify(lockService).acquireAccountLock(senderId);
+        order.verify(settlementService).settle(any(), any(), any(), any(), any());
     }
 
     // -------------------------------------------------------------------------
@@ -115,9 +120,7 @@ class RefundServiceTest extends ServiceTestBase {
                 .isInstanceOf(InvalidRefundException.class)
                 .hasMessageContaining("PENDING");
 
-        verify(ledgerService, never()).debit(any(), any());
-        verify(ledgerService, never()).credit(any(), any());
-        verify(transactionRepository, never()).save(any());
+        verifyNoInteractions(settlementService);
     }
 
     @Test
@@ -131,7 +134,7 @@ class RefundServiceTest extends ServiceTestBase {
                 .isInstanceOf(InvalidRefundException.class)
                 .hasMessageContaining("FAILED");
 
-        verify(ledgerService, never()).debit(any(), any());
+        verifyNoInteractions(settlementService);
     }
 
     @Test
@@ -160,7 +163,6 @@ class RefundServiceTest extends ServiceTestBase {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(txId.toString());
 
-        verify(ledgerService, never()).debit(any(), any());
-        verify(ledgerService, never()).credit(any(), any());
+        verifyNoInteractions(settlementService);
     }
 }
