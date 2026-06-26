@@ -220,3 +220,9 @@ ReceiptController              (public, unauthenticated — GET /receipt/{token}
 - Passwords and secrets are never committed — use environment variables only
 - Docker container runs as a non-root user (`appuser`)
 - Only `/actuator/health` is exposed; all other actuator endpoints are disabled
+
+---
+
+## License
+
+Licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE).
