@@ -1,6 +1,8 @@
 package com.upi.payment.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.upi.payment.dto.response.ErrorResponse;
 import com.upi.payment.util.PaymentConstants;
 import io.github.bucket4j.Bandwidth;
@@ -20,7 +22,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Token-bucket rate limiter for payment initiation and webhook callbacks.
@@ -34,7 +35,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * runs behind a trusted reverse proxy, configure Spring's ForwardedHeaderFilter with an
  * explicit trustedProxies list instead of reading the header directly here.
  *
- * Note: this in-memory map resets on restart and is per-instance only.
+ * Note: this in-memory cache resets on restart and is per-instance only.
+ * Entries expire after a window of inactivity so the per-IP cache doesn't grow
+ * unbounded under traffic from many distinct/spoofable client IPs.
  * For a multi-node deployment, replace with a Redis-backed Bucket4j store.
  */
 @Slf4j
@@ -49,9 +52,19 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
 
-    /** Separate bucket maps keep payment and webhook limits independent. */
-    private final ConcurrentHashMap<String, Bucket> paymentBuckets = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Bucket> webhookBuckets = new ConcurrentHashMap<>();
+    /**
+     * Separate bucket caches keep payment and webhook limits independent.
+     * Entries expire a window after their last use so idle/one-off client IPs don't
+     * accumulate forever in memory (a plain ConcurrentHashMap never evicted).
+     */
+    private final Cache<String, Bucket> paymentBuckets = buildBucketCache();
+    private final Cache<String, Bucket> webhookBuckets = buildBucketCache();
+
+    private static Cache<String, Bucket> buildBucketCache() {
+        return Caffeine.newBuilder()
+                .expireAfterAccess(Duration.ofSeconds(WINDOW_SECONDS))
+                .build();
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -74,8 +87,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         boolean isWebhook = request.getRequestURI().startsWith(PaymentConstants.WEBHOOKS_API_PATH);
 
         Bucket bucket = isWebhook
-                ? webhookBuckets.computeIfAbsent(clientIp, ip -> createBucket(WEBHOOK_MAX_REQUESTS))
-                : paymentBuckets.computeIfAbsent(clientIp, ip -> createBucket(PAYMENT_MAX_REQUESTS));
+                ? webhookBuckets.get(clientIp, ip -> createBucket(WEBHOOK_MAX_REQUESTS))
+                : paymentBuckets.get(clientIp, ip -> createBucket(PAYMENT_MAX_REQUESTS));
 
         int limit = isWebhook ? WEBHOOK_MAX_REQUESTS : PAYMENT_MAX_REQUESTS;
 
